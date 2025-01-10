@@ -1,11 +1,12 @@
 'use client';
 
-import { ReactNode } from 'react';
-import { WagmiProvider } from 'wagmi';
+import { ReactNode, useState, useEffect } from 'react';
+import { WagmiProvider, useAccount, useConnect, useDisconnect, useBalance } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { config } from './config';
-import { useAccount, useConnect, useDisconnect, useBalance } from 'wagmi';
 import Link from 'next/link';
+import {mainnet} from "wagmi/chains";
+import { switchChain } from '@wagmi/core'
 
 const queryClient = new QueryClient();
 
@@ -13,13 +14,43 @@ function Header() {
     const { isConnected, address, isConnecting } = useAccount();
     const { connect, connectors } = useConnect();
     const { disconnect } = useDisconnect();
+    const { chain } = useAccount();  // Pour récupérer la chaîne actuelle
     const { data: balance } = useBalance({ address });
+
+    const allowedChains = [1, 11155111];
+    const [error, setError] = useState<string | null>(null);
+
+    const isChainAllowed = allowedChains.includes(chain?.id ?? -1);
+
+    useEffect(() => {
+        if (!isConnected) {
+            return;
+        }
+        if (!isChainAllowed) {
+            setError('You are connected to an unsupported chain. Please switch to Ethereum Mainnet or Sepolia Testnet.');
+        } else {
+            setError(null);
+        }
+    }, [chain, isChainAllowed, isConnected]);
+
+    const handleSwitchNetwork = async () => {
+        if (switchChain) {
+            await switchChain(config, { chainId: mainnet.id })
+        }
+    };
 
     return (
         <header className="header">
             <h1>Blockchain App</h1>
+
+            {error && (
+                <div style={{ color: 'red', marginBottom: '10px' }}>
+                    <p>{error}</p>
+                    <button onClick={handleSwitchNetwork}>Switch to Ethereum Mainnet</button>
+                </div>
+            )}
+
             <div>
-                {/* Lien pour accéder à la page /chain-info */}
                 <Link href="/chain-info">
                     <button>Go to Chain Info</button>
                 </Link>
