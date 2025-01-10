@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAccount, usePublicClient } from 'wagmi';
+import { usePublicClient } from 'wagmi';
 import { formatEther, formatUnits } from 'viem';
+import {mainnet} from "wagmi/chains";
 
 type BlockInfo = {
+    chainId: number,
     blockNumber: bigint;
     blockHash: string;
     gasUsed: string;
@@ -13,7 +15,6 @@ type BlockInfo = {
 };
 
 const ChainInfoPage = () => {
-    const { chain } = useAccount();
     const publicClient = usePublicClient();
     const [blockInfo, setBlockInfo] = useState<BlockInfo | null>(null);
 
@@ -25,6 +26,7 @@ const ChainInfoPage = () => {
             }
 
             try {
+                const chainId = mainnet.id;
                 const blockNumber = await publicClient.getBlockNumber();
                 const block = await publicClient.getBlock({ blockNumber });
                 const gasPrice = await publicClient.getGasPrice();
@@ -32,6 +34,7 @@ const ChainInfoPage = () => {
                 const burntFees = baseFeePerGas * block.gasUsed;
 
                 setBlockInfo({
+                    chainId,
                     blockNumber,
                     blockHash: block.hash!,
                     gasUsed: block.gasUsed?.toString() || '0',
@@ -53,7 +56,7 @@ const ChainInfoPage = () => {
     return (
         <div>
             <h1>Chain Information</h1>
-            <p><strong>Connected Chain ID:</strong> {chain?.id}</p>
+            <p><strong>Connected Chain ID:</strong> {blockInfo.chainId}</p>
             <p><strong>Last Block Number:</strong> {blockInfo.blockNumber.toString()}</p>
             <p><strong>Latest Block Hash:</strong> {blockInfo.blockHash}</p>
             <p><strong>Gas Used:</strong> {blockInfo.gasUsed}</p>
