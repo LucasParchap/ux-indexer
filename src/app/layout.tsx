@@ -5,28 +5,78 @@ import { WagmiProvider, useAccount, useConnect, useDisconnect, useBalance } from
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { config } from './config';
 import Link from 'next/link';
-import {mainnet} from "wagmi/chains";
-import { switchChain } from '@wagmi/core'
+import { mainnet } from 'wagmi/chains';
+import { switchChain } from '@wagmi/core';
+import './globals.css';
+import { usePathname  } from 'next/navigation';
 
 const queryClient = new QueryClient();
 
 function Header() {
-    const { isConnected, address, isConnecting } = useAccount();
     const { connect, connectors } = useConnect();
     const { disconnect } = useDisconnect();
-    const { chain } = useAccount();  // Pour récupérer la chaîne actuelle
+    const { isConnected, isConnecting } = useAccount();
+    const [isChainInfoPage, setIsChainInfoPage] = useState(false);
+    const pathname = usePathname();
+
+    useEffect(() => {
+        if (pathname === "/chain-info") {
+            setIsChainInfoPage(true);
+        } else {
+            setIsChainInfoPage(false);
+        }
+    }, [pathname]);
+
+    return (
+        <header className="header">
+            <h1>Blockchain App</h1>
+
+            <div className="header-buttons">
+                {/* Bouton pour aller à la page Chain Info */}
+                {!isChainInfoPage ? (
+                    <Link href="/chain-info">
+                        <button>Go to Chain Info</button>
+                    </Link>
+                ) : (
+                    <Link href="/">
+                        <button>Return to Home</button>
+                    </Link>
+                )}
+
+                {/* Connexion / déconnexion */}
+                {!isConnected ? (
+                    <div>
+                        {connectors.map((connector) => (
+                            <button
+                                key={connector.id}
+                                onClick={() => connect({ connector })}
+                                disabled={isConnecting}
+                            >
+                                {isConnecting ? 'Connecting...' : `Connect with ${connector.name}`}
+                            </button>
+                        ))}
+                    </div>
+                ) : (
+                    <div>
+                        <button onClick={() => disconnect()}>Disconnect</button>
+                    </div>
+                )}
+            </div>
+        </header>
+    );
+}
+
+function Body() {
+    const { isConnected, address, chain } = useAccount();
     const { data: balance } = useBalance({ address });
 
-    const allowedChains = [1, 11155111];
+    const allowedChains = [1, 11155111];  // Ethereum Mainnet and Sepolia Testnet
     const [error, setError] = useState<string | null>(null);
 
     const isChainAllowed = allowedChains.includes(chain?.id ?? -1);
 
     useEffect(() => {
-        if (!isConnected) {
-            return;
-        }
-        if (!isChainAllowed) {
+        if (isConnected && !isChainAllowed) {
             setError('You are connected to an unsupported chain. Please switch to Ethereum Mainnet or Sepolia Testnet.');
         } else {
             setError(null);
@@ -40,9 +90,7 @@ function Header() {
     };
 
     return (
-        <header className="header">
-            <h1>Blockchain App</h1>
-
+        <main>
             {error && (
                 <div style={{ color: 'red', marginBottom: '10px' }}>
                     <p>{error}</p>
@@ -50,36 +98,16 @@ function Header() {
                 </div>
             )}
 
-            <div>
-                <Link href="/chain-info">
-                    <button>Go to Chain Info</button>
-                </Link>
-            </div>
-
-            {!isConnected ? (
-                <div>
-                    {connectors.map((connector) => (
-                        <button
-                            key={connector.id}
-                            onClick={() => connect({ connector })}
-                            disabled={isConnecting}
-                        >
-                            {isConnecting ? 'Connecting...' : `Connect with ${connector.name}`}
-                        </button>
-                    ))}
-                </div>
-            ) : (
+            {isConnected && !error && (
                 <div>
                     <p>Connected Wallet: {address}</p>
                     <p>Balance: {balance?.formatted} {balance?.symbol}</p>
-                    <button onClick={() => disconnect()}>Disconnect</button>
                 </div>
             )}
-        </header>
+        </main>
     );
 }
 
-// Main Layout of the app
 export default function RootLayout({ children }: { children: ReactNode }) {
     return (
         <html lang="en">
@@ -88,6 +116,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <WagmiProvider config={config}>
                 <Header />
                 <main>{children}</main>
+                <Body />
             </WagmiProvider>
         </QueryClientProvider>
         </body>
