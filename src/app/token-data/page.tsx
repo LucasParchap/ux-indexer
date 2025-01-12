@@ -1,122 +1,106 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-
-interface TokenInfo {
-    symbol: string;
-    name: string;
-    decimals: number;
-    totalSupply: string;
-}
-
-interface Metric {
-    totalTransfers: number;
-    totalHolders: number;
-}
-
-interface Balance {
-    address: string;
-    balance: string;
-}
+import { useEffect, useState } from 'react';
+import { fetchMetrics, fetchTokens, fetchTokenBalances, MetricsResponse, TokensResponse } from '../../lib/graphqlClient';
 
 export default function TokenDataPage() {
-    const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
-    const [balances, setBalances] = useState<Balance[]>([]);
-    const [metrics, setMetrics] = useState<Metric | null>(null);
-    const [selectedAddress, setSelectedAddress] = useState<string>('');
+    const [metrics, setMetrics] = useState<MetricsResponse['metrics'][0] | null>(null);
+    const [tokens, setTokens] = useState<TokensResponse['tokens']>([]);
+    const [address, setAddress] = useState<string>(''); // Adresse entrée par l'utilisateur
+    const [balances, setBalances] = useState<{ token: string; balance: string }[]>([]);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const fetchData = async () => {
+        async function loadData() {
             try {
-                const tokenResponse = await fetch('/token-data/api/token');
-                const tokenData: TokenInfo = await tokenResponse.json();
-                setTokenInfo(tokenData);
-
-                const metricsResponse = await fetch('/token-data/api/metrics');
-                const metricsData: Metric = await metricsResponse.json();
+                const metricsData = await fetchMetrics();
                 setMetrics(metricsData);
-            } catch (error) {
-                console.error('Error fetching token data:', error);
-            }
-        };
 
-        fetchData();
+                const tokensData = await fetchTokens();
+                setTokens(tokensData.tokens);
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        }
+
+        loadData();
     }, []);
 
-    const fetchBalances = async () => {
+    const handleFetchBalances = async () => {
+        if (!address) {
+            setError('Please enter a valid address');
+            return;
+        }
+        setError(null);
         try {
-            const response = await fetch(`/token-data/api/balance?address=${selectedAddress}`);
-            const data: Balance[] = await response.json();
-            setBalances(data);
-        } catch (error) {
-            console.error('Error fetching balances:', error);
+            const balancesData = await fetchTokenBalances(address);
+            setBalances(balancesData);
+        } catch (err) {
+            console.log(address);
+            console.error('Error fetching balances:', err);
+            setError('Failed to fetch balances. Please try again.');
         }
     };
 
     return (
-        <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+        <div>
             <h1>Token Data</h1>
 
-            {/* Token Information */}
-            {tokenInfo ? (
-                <section>
-                    <h2>Token Information</h2>
-                    <p>
-                        <strong>Symbol:</strong> {tokenInfo.symbol}
-                    </p>
-                    <p>
-                        <strong>Name:</strong> {tokenInfo.name}
-                    </p>
-                    <p>
-                        <strong>Decimals:</strong> {tokenInfo.decimals}
-                    </p>
-                    <p>
-                        <strong>Total Supply:</strong> {tokenInfo.totalSupply}
-                    </p>
-                </section>
-            ) : (
-                <p>Loading token information...</p>
+            {/* Metrics Section */}
+            {metrics && (
+                <div>
+                    <h2>Metrics</h2>
+                    <p>Total Transfers: {metrics.totalTransfers}</p>
+                    <p>Total Holders: {metrics.totalHolders}</p>
+                </div>
             )}
 
-            {/* Metrics */}
-            {metrics ? (
-                <section>
-                    <h2>Token Metrics</h2>
-                    <p>
-                        <strong>Total Transfers:</strong> {metrics.totalTransfers}
-                    </p>
-                    <p>
-                        <strong>Total Holders:</strong> {metrics.totalHolders}
-                    </p>
-                </section>
-            ) : (
-                <p>Loading metrics...</p>
+            {/* Tokens Section */}
+            <h2>Tokens</h2>
+            <ul>
+                {tokens.map((token) => (
+                    <li key={token.id}>
+                        {token.name} ({token.symbol}) - Decimals: {token.decimals}
+                    </li>
+                ))}
+            </ul>
+
+            {/* Address Input Section */}
+            <h2>Token Balances</h2>
+            <input
+                type="text"
+                placeholder="Enter address"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                style={{ width: '300px', padding: '8px', marginRight: '10px' }}
+            />
+            <button
+                onClick={handleFetchBalances}
+                style={{
+                    padding: '8px 12px',
+                    backgroundColor: '#007bff',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                }}
+            >
+                Get Balances
+            </button>
+
+            {/* Error Message */}
+            {error && <p style={{ color: 'red' }}>{error}</p>}
+
+            {/* Balances Section */}
+            {balances.length > 0 && (
+                <ul>
+                    {balances.map((balance, index) => (
+                        <li key={index}>
+                            Token: {balance.token}, Balance: {balance.balance}
+                        </li>
+                    ))}
+                </ul>
             )}
-
-            {/* Balances */}
-            <section>
-                <h2>Token Balances</h2>
-                <input
-                    type="text"
-                    placeholder="Enter address"
-                    value={selectedAddress}
-                    onChange={(e) => setSelectedAddress(e.target.value)}
-                />
-                <button onClick={fetchBalances}>Get Balances</button>
-
-                {balances.length > 0 ? (
-                    <ul>
-                        {balances.map((balance, index) => (
-                            <li key={index}>
-                                <strong>Address:</strong> {balance.address} - <strong>Balance:</strong>{' '}
-                                {balance.balance}
-                            </li>
-                        ))}
-                    </ul>
-                ) : (
-                    <p>No balances to display.</p>
-                )}
-            </section>
         </div>
     );
 }
