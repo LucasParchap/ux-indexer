@@ -43,6 +43,10 @@ function Header() {
                     </Link>
                 )}
 
+                <Link href="/token-data">
+                    <button>Go to Token Data</button>
+                </Link>
+
                 {/* Connexion / déconnexion */}
                 {!isConnected ? (
                     <div>
